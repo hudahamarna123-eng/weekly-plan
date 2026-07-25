@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الخطة الأسبوعية للطالب</title>
+
+<!-- خطوط عربية من Google Fonts: Cairo للعناوين، Tajawal للنصوص -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- شريط علوي: زر إظهار/إخفاء عند وضع القراءة فقط لولي الأمر -->
+<div id="readOnlyBanner" class="read-only-banner hidden">
+  <span>👨‍👩‍👧 عرض ولي الأمر — للقراءة والتحميل فقط، لا يمكن التعديل أو الحذف</span>
+</div>
+
+<!-- شريط تنبيه: يظهر عندما لا تكون قاعدة البيانات (Firebase) مُعدّة أو متصلة -->
+<div id="dbSetupBanner" class="db-setup-banner hidden">
+  🔴 غير متصل بقاعدة البيانات — الحفظ والاسترجاع معطّلان حتى يتم ربط Firebase.
+  افتح <code>script.js</code> وأضف بيانات مشروعك في <code>FIREBASE_CONFIG</code> بأعلى الملف.
+</div>
+
+<div class="page-wrap" id="pageWrap">
+
+  <!-- ============ شريط الأزرار العلوي ============ -->
+  <div class="toolbar no-print" id="toolbar">
+    <div class="toolbar-title">
+      <span class="toolbar-logo">📘</span>
+      <span>الخطة الأسبوعية</span>
+    </div>
+    <div class="toolbar-actions">
+      <button class="btn btn-primary" id="btnSave" title="حفظ الخطة">💾 حفظ الخطة</button>
+      <button class="btn btn-outline" id="btnEdit" title="تعديل الخطة">✏️ تعديل</button>
+      <button class="btn btn-outline" id="btnPrint" title="طباعة الخطة">🖨️ طباعة</button>
+      <button class="btn btn-outline" id="btnPdf" title="تحميل PDF">⬇️ تحميل PDF</button>
+      <button class="btn btn-share" id="btnShare" title="مشاركة مع ولي الأمر">📤 مشاركة مع ولي الأمر</button>
+      <div class="toolbar-menu">
+        <button class="btn btn-ghost" id="btnMenuToggle" title="المزيد">⋯</button>
+        <div class="menu-dropdown hidden" id="menuDropdown">
+          <button id="btnCopyPrev">📋 نسخ خطة الأسبوع السابق</button>
+          <button id="btnExport">📦 تصدير JSON</button>
+          <button id="btnImportTrigger">📥 استيراد JSON</button>
+          <input type="file" id="fileImport" accept="application/json" class="hidden">
+          <button id="btnClearAll" class="danger">🗑️ مسح جميع البيانات</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ رأس الصفحة: بيانات المدرسة والطالب ============ -->
+  <header class="sheet-header" id="sheetHeader">
+    <div class="ribbon" id="weekRibbon">
+      <span id="ribbonText">أسبوع 1</span>
+    </div>
+
+    <div class="header-top">
+      <label class="logo-box no-print" id="logoBox" title="إضافة شعار المدرسة">
+        <img id="logoImg" src="" alt="شعار المدرسة" class="hidden">
+        <span id="logoPlaceholder">🏫<br><small>إضافة شعار</small></span>
+        <input type="file" id="logoInput" accept="image/*" class="hidden">
+      </label>
+      <img id="logoImgPrint" src="" alt="" class="logo-print hidden">
+
+      <div class="header-titles">
+        <h1>الخطة الأسبوعية للطالب</h1>
+        <p class="school-fixed">🏫 مدرسة السلف الصالح الخاصة</p>
+      </div>
+
+      <div class="week-picker no-print">
+        <label for="weekInput">اختر الأسبوع</label>
+        <input type="week" id="weekInput">
+      </div>
+    </div>
+
+    <div class="header-grid">
+      <div class="field">
+        <label>العام الأكاديمي</label>
+        <input type="text" id="academicYear" placeholder="مثال: 2026 / 2027">
+      </div>
+      <div class="field">
+        <label>الصف</label>
+        <select id="grade">
+          <option value="">اختر الصف</option>
+          <option value="الصف الأول">الصف الأول</option>
+          <option value="الصف الثاني">الصف الثاني</option>
+          <option value="الصف الثالث">الصف الثالث</option>
+          <option value="الصف الرابع">الصف الرابع</option>
+          <option value="الصف الخامس">الصف الخامس</option>
+          <option value="الصف السادس">الصف السادس</option>
+          <option value="الصف السابع">الصف السابع</option>
+          <option value="الصف الثامن">الصف الثامن</option>
+          <option value="الصف التاسع">الصف التاسع</option>
+          <option value="الصف العاشر">الصف العاشر</option>
+          <option value="الصف الحادي عشر">الصف الحادي عشر</option>
+          <option value="الصف الثاني عشر">الصف الثاني عشر</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>الشعبة</label>
+        <select id="section">
+          <option value="">اختر الشعبة</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="D">D</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>رائد الصف</label>
+        <input type="text" id="homeroom" placeholder="اسم رائد الصف">
+      </div>
+      <div class="field">
+        <label>اسم الطالب <small>(اختياري)</small></label>
+        <input type="text" id="studentName" placeholder="اسم الطالب">
+      </div>
+      <div class="field">
+        <label>رقم الأسبوع</label>
+        <input type="number" id="weekNumber" min="1" max="52" value="1">
+      </div>
+      <div class="field retrieve-field">
+        <label>&nbsp;</label>
+        <button type="button" class="btn btn-retrieve" id="btnRetrievePlan" title="استرجاع الخطة المحفوظة لهذا الصف والشعبة">
+          🔄 استرجاع الخطة المحفوظة
+        </button>
+      </div>
+    </div>
+
+    <!-- عدادات سريعة -->
+    <div class="counters">
+      <div class="counter-chip lesson-chip">
+        <span class="chip-icon">📘</span>
+        <span class="chip-label">الدروس</span>
+        <span class="chip-count" id="lessonCount">0</span>
+      </div>
+      <div class="counter-chip hw-chip">
+        <span class="chip-icon">🟢</span>
+        <span class="chip-label">الواجبات</span>
+        <span class="chip-count" id="hwCount">0</span>
+      </div>
+      <div class="counter-chip exam-chip">
+        <span class="chip-icon">🔴</span>
+        <span class="chip-label">الاختبارات</span>
+        <span class="chip-count" id="examCount">0</span>
+      </div>
+      <div class="counter-chip save-chip">
+        <span class="chip-icon">☁️</span>
+        <span class="chip-label" id="saveStatus">تم الحفظ تلقائياً</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- شريط تحميل PDF خاص بولي الأمر، يظهر فقط عند فتح رابط المشاركة -->
+  <div class="parent-download-bar hidden" id="parentDownloadBar">
+    <button class="btn btn-primary" id="btnParentDownload">⬇️ تحميل الخطة PDF</button>
+  </div>
+
+  <!-- ============ جدول الأسبوع: الأيام رأسياً على اليمين، المواد أفقياً ============ -->
+  <main class="week-table-wrap" id="weekGrid">
+    <!-- يتم بناء الجدول ديناميكياً بواسطة JavaScript -->
+  </main>
+  <p class="scroll-hint no-print">↔️ مرّر الجدول يميناً/يساراً لرؤية جميع المواد التسع (التربية الإسلامية، العربية، الإنجليزية، الرياضيات، العلوم، الفيزياء، الكيمياء، الأحياء، الاجتماعيات)</p>
+
+  <!-- ============ ملاحظات ولي الأمر ============ -->
+  <section class="parent-notes">
+    <div class="parent-notes-header">
+      <span class="parent-icon">💛</span>
+      <h2>ملاحظات لولي الأمر</h2>
+      <span class="parent-hint">ملاحظات، تنبيهات، روابط تعليمية، ملفات، فيديوهات، نصائح</span>
+    </div>
+    <textarea id="parentNotes" placeholder="اكتب هنا أي ملاحظات أو تنبيهات أو روابط تهم ولي الأمر..." rows="5"></textarea>
+  </section>
+
+  <footer class="sheet-footer">
+    <span>تم إنشاء هذه الخطة عبر نظام الخطة الأسبوعية للطالب</span>
+    <span id="footerDate"></span>
+  </footer>
+</div>
+
+<!-- ============ نافذة المشاركة ============ -->
+<div class="modal-overlay hidden" id="shareModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📤 مشاركة الخطة مع ولي الأمر</h3>
+      <button class="modal-close" id="closeShareModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p>يمكن لولي الأمر فتح هذا الرابط مباشرة من الهاتف دون الحاجة لتسجيل الدخول، وستكون الصفحة للقراءة فقط.</p>
+      <div class="share-link-row">
+        <input type="text" id="shareLinkInput" readonly>
+        <button class="btn btn-outline" id="btnCopyLink">📋 نسخ</button>
+      </div>
+      <div class="share-buttons">
+        <a href="#" target="_blank" class="btn btn-whatsapp" id="btnWhatsapp">💬 واتساب</a>
+        <a href="#" class="btn btn-outline" id="btnEmail">✉️ البريد الإلكتروني</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- مكتبة تحويل الصفحة إلى PDF (تُحمَّل من المتصفح عند الطلب) -->
+<!-- Firebase (اختياري) لتفعيل حفظ سحابي حقيقي بين عدة معلمين وأجهزة مختلفة.
+     إن لم تُضِف إعدادات مشروعك في script.js، يعمل النظام محلياً فقط
+     (LocalStorage) بدون أي تأثير أو أخطاء. -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
