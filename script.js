@@ -60,12 +60,12 @@ const SUBJECTS = [
    4. الصق القيم في الكائن أدناه بدلاً من الفراغات، واحفظ الملف.
    ------------------------------------------------------------ */
 const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
+  apiKey: "AIzaSyBxIuUbbJfAE23lzeXjOFUcy135rXpsHnQ",
+  authDomain: "weekly-plan-cfbef.firebaseapp.com",
+  projectId: "weekly-plan-cfbef",
+  storageBucket: "weekly-plan-cfbef.firebasestorage.app",
+  messagingSenderId: "578063324097",
+  appId: "1:578063324097:web:20cb23c5aa817375a11540",
 };
 
 let firestoreDB = null; // تبقى null ما لم يُفعَّل Firebase أعلاه
