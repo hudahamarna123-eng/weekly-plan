@@ -575,45 +575,116 @@ function importJSON(file) {
 }
 
 /* ------------------------------------------------------------
-   12) الطباعة و PDF
+   12) الطباعة و PDF — تُبنى صفحة منظمة مخصّصة للطباعة (يوماً بيوم،
+   كل مادة بها محتوى في جدول واضح) بدلاً من التقاط صورة للجدول
+   التفاعلي المضغوط (الذي يصعب قراءته في ملف مطبوع).
    ------------------------------------------------------------ */
+function escapeHtml(str) {
+  return (str || "")
+    .toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/\n/g, "<br>");
+}
+
+// يبني صفحة طباعة منظمة (يوم بيوم) من بيانات الخطة الحالية، وتُستخدم
+// في كل من الطباعة العادية (window.print) وفي تحميل PDF
+function buildPrintableArea() {
+  const container = document.getElementById("printableArea");
+  if (!container) return;
+
+  const metaRows = [
+    ["العام الأكاديمي", state.academicYear],
+    ["الصف", state.grade],
+    ["الشعبة", state.section],
+    ["رائد الصف", state.homeroom],
+    ["اسم الطالب", state.studentName],
+    ["الأسبوع", state.weekNumber],
+  ]
+    .filter(([, v]) => v)
+    .map(
+      ([label, value]) =>
+        `<div class="print-meta-item"><span class="print-meta-label">${escapeHtml(label)}</span><span class="print-meta-value">${escapeHtml(value)}</span></div>`
+    )
+    .join("");
+
+  let daysHtml = "";
+  WEEK_DAYS.forEach((day) => {
+    const rows = SUBJECTS.map((sub) => {
+      const entry = state.days[day.key][sub.key] || {};
+      if (!entry.lesson && !entry.hw && !entry.exam) return "";
+      return `
+        <tr>
+          <td class="print-subject-cell">${sub.icon} ${escapeHtml(sub.name)}</td>
+          <td>${escapeHtml(entry.lesson) || "—"}</td>
+          <td>${escapeHtml(entry.hw) || "—"}</td>
+          <td>${escapeHtml(entry.exam) || "—"}</td>
+        </tr>`;
+    }).join("");
+
+    if (!rows) return; // تخطَّ الأيام التي لا تحتوي أي محتوى مكتوب إطلاقاً
+
+    daysHtml += `
+      <div class="print-day-block">
+        <h2 class="print-day-title">📅 ${escapeHtml(day.name)}</h2>
+        <table class="print-day-table">
+          <thead>
+            <tr><th>المادة</th><th>📘 الدرس</th><th>🟢 الواجب</th><th>🔴 الاختبار</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  });
+
+  if (!daysHtml) {
+    daysHtml = `<p class="print-empty">لا يوجد محتوى مكتوب بعد لهذا الأسبوع.</p>`;
+  }
+
+  const notesHtml = state.parentNotes
+    ? `<div class="print-notes"><h2>💛 ملاحظات لولي الأمر</h2><p>${escapeHtml(state.parentNotes)}</p></div>`
+    : "";
+
+  const logoHtml = state.logo ? `<img src="${state.logo}" class="print-logo" alt="شعار المدرسة">` : "";
+
+  container.innerHTML = `
+    <div class="print-header">
+      ${logoHtml}
+      <div class="print-school">🏫 مدرسة السلف الصالح الخاصة</div>
+      <h1>الخطة الأسبوعية للطالب</h1>
+      <div class="print-meta-grid">${metaRows}</div>
+    </div>
+    ${daysHtml}
+    ${notesHtml}
+    <div class="print-footer">تم إنشاء هذه الخطة عبر نظام الخطة الأسبوعية للطالب — ${new Date().toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" })}</div>
+  `;
+}
+
 function printPlan() {
+  buildPrintableArea();
   window.print();
 }
 
 function downloadPdf() {
-  const el = document.getElementById("pageWrap");
-  document.body.classList.add("print-mode");
-
   if (typeof html2pdf === "undefined") {
     alert("تعذّر تحميل أداة PDF، تأكد من اتصالك بالإنترنت ثم أعد المحاولة، أو استخدم زر الطباعة واختر «حفظ كـ PDF».");
-    document.body.classList.remove("print-mode");
     return;
   }
 
-  // مهلة قصيرة كي تُطبَّق أنماط "print-mode" (إظهار الجدول كاملاً بلا
-  // تمرير ولا عناصر ثابتة sticky) قبل التقاط الصورة، وإلا قد يُلتقط
-  // الجزء المرئي فقط من الجدول وتظهر الخطة ناقصة في الملف
-  setTimeout(() => {
-    const fullWidth = Math.max(el.scrollWidth, el.offsetWidth);
-    const fullHeight = Math.max(el.scrollHeight, el.offsetHeight);
+  buildPrintableArea();
+  document.body.classList.add("print-mode");
+  const el = document.getElementById("printableArea");
 
+  // مهلة قصيرة كي تُطبَّق الأنماط قبل الالتقاط
+  setTimeout(() => {
     const opt = {
-      margin: 6,
+      margin: 10,
       filename: `خطة-اسبوعية-${getCurrentPlanId()}.pdf`,
       image: { type: "jpeg", quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: fullWidth,
-        windowHeight: fullHeight,
-        width: fullWidth,
-        height: fullHeight,
-      },
-      jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
-      pagebreak: { mode: ["avoid-all", "css"] },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      pagebreak: { mode: ["css", "legacy"] },
     };
 
     html2pdf()
