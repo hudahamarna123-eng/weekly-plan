@@ -537,19 +537,66 @@ body.read-only-mode .parent-notes textarea:disabled{
 }
 
 /* ============================================================
-   وضع الطباعة و PDF — مناسب لورقة A4 (اتجاه أفقي)
+   صفحة الطباعة/PDF المنظمة (يوماً بيوم) — مخفية دائماً أثناء
+   الاستخدام العادي، وتظهر فقط عند الطباعة أو تحميل PDF
    ============================================================ */
+.printable-area{display:none;}
+
+.print-mode #pageWrap, .print-mode .toolbar, .print-mode .read-only-banner,
+.print-mode .db-setup-banner, .print-mode .parent-download-bar, .print-mode .scroll-hint{
+  display:none !important;
+}
+.print-mode .printable-area{
+  display:block;
+  max-width:800px;
+  margin:0 auto;
+  background:#fff;
+  color:var(--ink-900);
+  font-family:var(--font-body);
+  padding:10px;
+}
+
+.print-header{text-align:center;margin-bottom:22px;border-bottom:3px solid var(--blue-700);padding-bottom:14px;}
+.print-logo{width:64px;height:64px;object-fit:cover;border-radius:50%;margin-bottom:8px;}
+.print-school{
+  display:inline-block;background:var(--blue-100);color:var(--blue-700);
+  font-family:var(--font-display);font-weight:700;font-size:14px;
+  padding:4px 14px;border-radius:999px;margin-bottom:6px;
+}
+.print-header h1{font-family:var(--font-display);font-weight:900;font-size:24px;color:var(--blue-900);margin:4px 0 14px;}
+.print-meta-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 22px;}
+.print-meta-item{font-size:13px;color:var(--ink-700);}
+.print-meta-label{font-weight:700;color:var(--blue-900);margin-left:5px;}
+.print-meta-value{color:var(--ink-900);}
+
+.print-day-block{margin-bottom:20px;break-inside:avoid;page-break-inside:avoid;}
+.print-day-title{
+  font-family:var(--font-display);font-weight:800;font-size:16px;
+  background:linear-gradient(90deg,var(--blue-700),var(--blue-500));
+  color:#fff;padding:8px 14px;border-radius:10px 10px 0 0;margin:0;
+}
+.print-day-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.print-day-table th{
+  background:var(--blue-100);color:var(--blue-900);font-family:var(--font-display);
+  font-weight:700;padding:7px 8px;border:1px solid var(--border);text-align:center;
+}
+.print-day-table td{padding:7px 8px;border:1px solid var(--border);vertical-align:top;line-height:1.5;}
+.print-subject-cell{font-weight:700;color:var(--blue-900);white-space:nowrap;background:#fbfcfe;}
+.print-empty{text-align:center;color:var(--ink-300);padding:30px 0;}
+
+.print-notes{
+  margin-top:10px;background:var(--yellow-100);border:1.5px solid var(--yellow-border);
+  border-radius:12px;padding:14px 16px;break-inside:avoid;
+}
+.print-notes h2{font-family:var(--font-display);font-size:14px;color:#8a5f02;margin:0 0 8px;}
+.print-notes p{font-size:12.5px;line-height:1.7;margin:0;white-space:pre-wrap;}
+
+.print-footer{text-align:center;color:var(--ink-300);font-size:10.5px;margin-top:18px;}
+
 @media print{
   body{background:#fff;}
-  .no-print, .toolbar, .read-only-banner, .modal-overlay, .parent-download-bar{display:none !important;}
-  .page-wrap{padding:0;max-width:100%;}
-  .week-table-wrap{overflow:visible;box-shadow:none;}
-  .table-corner, .subject-head-cell, .day-row-label{position:static;}
-  .sheet-header, .parent-notes{box-shadow:none;break-inside:avoid;}
-  .table-cell, .day-row-label{break-inside:avoid;}
-  @page{size:A4 landscape;margin:10mm;}
+  .no-print{display:none !important;}
+  #pageWrap, .toolbar, .read-only-banner, .db-setup-banner, .modal-overlay, .parent-download-bar{display:none !important;}
+  .printable-area{display:block !important;max-width:100%;}
+  @page{size:A4 portrait;margin:12mm;}
 }
-.print-mode .no-print{display:none !important;}
-.print-mode .parent-download-bar{display:none !important;}
-.print-mode .week-table-wrap{overflow:visible;box-shadow:none;}
-.print-mode .table-corner, .print-mode .subject-head-cell, .print-mode .day-row-label{position:static;}
