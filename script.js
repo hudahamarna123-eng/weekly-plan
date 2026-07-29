@@ -14,11 +14,11 @@
 const SCHOOL_NAME = "مدرسة السلف الصالح الخاصة"; // اسم المدرسة ثابت ولا يمكن تعديله من الواجهة
 
 const WEEK_DAYS = [
-  { key: "sun", name: "الأحد",    icon: "1" },
-  { key: "mon", name: "الإثنين",  icon: "2" },
-  { key: "tue", name: "الثلاثاء", icon: "3" },
-  { key: "wed", name: "الأربعاء", icon: "4" },
-  { key: "thu", name: "الخميس",   icon: "5" },
+  { key: "mon", name: "الإثنين",  icon: "1" },
+  { key: "tue", name: "الثلاثاء", icon: "2" },
+  { key: "wed", name: "الأربعاء", icon: "3" },
+  { key: "thu", name: "الخميس",   icon: "4" },
+  { key: "sun", name: "الأحد",    icon: "5" },
 ];
 // إن كان أسبوعك الدراسي (الإثنين - الجمعة) بدّل المصفوفة أعلاه بهذه:
 // const WEEK_DAYS = [
