@@ -18,7 +18,7 @@ const WEEK_DAYS = [
   { key: "tue", name: "الثلاثاء", icon: "2" },
   { key: "wed", name: "الأربعاء", icon: "3" },
   { key: "thu", name: "الخميس",   icon: "4" },
-  { key: "sun", name: "الأحد",    icon: "5" },
+  { key: "fri", name: "الجمعة",   icon: "5" },
 ];
 // إن كان أسبوعك الدراسي (الإثنين - الجمعة) بدّل المصفوفة أعلاه بهذه:
 // const WEEK_DAYS = [
