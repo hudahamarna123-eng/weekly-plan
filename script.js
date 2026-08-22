@@ -14,11 +14,11 @@
 const SCHOOL_NAME = "مدرسة السلف الصالح الخاصة"; // اسم المدرسة ثابت ولا يمكن تعديله من الواجهة
 
 const WEEK_DAYS = [
-  { key: "mon", name: "الإثنين",  icon: "1" },
-  { key: "tue", name: "الثلاثاء", icon: "2" },
-  { key: "wed", name: "الأربعاء", icon: "3" },
-  { key: "thu", name: "الخميس",   icon: "4" },
-  { key: "fri", name: "الجمعة",   icon: "5" },
+  { key: "sun", name: "الأحد",    icon: "1" },
+  { key: "mon", name: "الإثنين",  icon: "2" },
+  { key: "tue", name: "الثلاثاء", icon: "3" },
+  { key: "wed", name: "الأربعاء", icon: "4" },
+  { key: "thu", name: "الخميس",   icon: "5" },
 ];
 // إن كان أسبوعك الدراسي (الإثنين - الجمعة) بدّل المصفوفة أعلاه بهذه:
 // const WEEK_DAYS = [
@@ -80,8 +80,20 @@ function initFirebaseIfConfigured() {
   try {
     firebase.initializeApp(FIREBASE_CONFIG);
     firestoreDB = firebase.firestore();
-    isDbConnected = true;
-    hideDbSetupBanner();
+    // تسجيل دخول مجهول (Anonymous Auth) إلزامي حتى تعمل قواعد الأمان الدائمة
+    // في Firestore (allow read, write: if request.auth != null;). بدون هذا،
+    // يجب إبقاء قاعدة قاعدة البيانات مفتوحة للجميع، وهذا غير آمن على المدى الطويل.
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user) {
+        isDbConnected = true;
+        hideDbSetupBanner();
+      }
+    });
+    firebase.auth().signInAnonymously().catch((e) => {
+      console.error("تعذّر تسجيل الدخول المجهول لـ Firebase:", e);
+      isDbConnected = false;
+      showDbSetupBanner();
+    });
   } catch (e) {
     console.error("تعذّر تفعيل Firebase:", e);
     isDbConnected = false;
