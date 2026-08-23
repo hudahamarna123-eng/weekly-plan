@@ -36,10 +36,10 @@ const SUBJECTS = [
   { key: "english",   name: "اللغة الإنجليزية",  icon: "🔤" },
   { key: "math",      name: "الرياضيات",         icon: "➗" },
   { key: "science",   name: "العلوم",            icon: "🔬" },
+  { key: "social",    name: "الاجتماعيات",       icon: "🌍" },
   { key: "physics",   name: "الفيزياء",          icon: "⚛️" },
   { key: "chemistry", name: "الكيمياء",          icon: "🧪" },
   { key: "biology",   name: "الأحياء",           icon: "🧬" },
-  { key: "social",    name: "الاجتماعيات",       icon: "🌍" },
 ];
 
 /* ------------------------------------------------------------
