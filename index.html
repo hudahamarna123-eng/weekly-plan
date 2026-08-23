@@ -38,12 +38,12 @@
       <button class="btn btn-outline" id="btnEdit" title="تعديل الخطة">✏️ تعديل</button>
       <button class="btn btn-outline" id="btnPrint" title="طباعة الخطة">🖨️ طباعة</button>
       <button class="btn btn-outline" id="btnPdf" title="تحميل PDF">⬇️ تحميل PDF</button>
-      <button class="btn btn-share" id="btnShare" title="مشاركة مع ولي الأمر">📤 مشاركة مع ولي الأمر</button>
+      <button class="btn btn-share" id="btnShare" title="رابط دائم لجميع الصفوف والشعب، يختار ولي الأمر منه صف كل ابن">📤 رابط ولي الأمر</button>
       <div class="toolbar-menu">
         <button class="btn btn-ghost" id="btnMenuToggle" title="المزيد">⋯</button>
         <div class="menu-dropdown hidden" id="menuDropdown">
           <button id="btnCopyPrev">📋 نسخ خطة الأسبوع السابق</button>
-          <button id="btnParentPortalLink">👨‍👩‍👧‍👦 رابط عام لجميع الأبناء (ولي الأمر يختار الصف بنفسه)</button>
+          <button id="btnLegacySnapshotLink">📎 رابط لقطة هذا الأسبوع فقط (لا يتحدّث لاحقاً)</button>
           <button id="btnManagePlans">🗂️ إدارة/حذف الخطط المحفوظة</button>
           <button id="btnExport">📦 تصدير JSON</button>
           <button id="btnImportTrigger">📥 استيراد JSON</button>
@@ -62,11 +62,10 @@
     </div>
 
     <div class="header-top">
-      <label class="logo-box no-print" id="logoBox" title="إضافة شعار المدرسة">
+      <div class="logo-box" id="logoBox" title="شعار المدرسة">
         <img id="logoImg" src="" alt="شعار المدرسة" class="hidden">
-        <span id="logoPlaceholder">🏫<br><small>إضافة شعار</small></span>
-        <input type="file" id="logoInput" accept="image/*" class="hidden">
-      </label>
+        <span id="logoPlaceholder">🏫</span>
+      </div>
       <img id="logoImgPrint" src="" alt="" class="logo-print hidden">
 
       <div class="header-titles">
@@ -188,11 +187,11 @@
 <div class="modal-overlay hidden" id="shareModal">
   <div class="modal">
     <div class="modal-header">
-      <h3>📤 مشاركة الخطة مع ولي الأمر</h3>
+      <h3 id="shareModalTitle">📤 مشاركة الخطة مع ولي الأمر</h3>
       <button class="modal-close" id="closeShareModal">✕</button>
     </div>
     <div class="modal-body">
-      <p>يمكن لولي الأمر فتح هذا الرابط مباشرة من الهاتف دون الحاجة لتسجيل الدخول، وستكون الصفحة للقراءة فقط.</p>
+      <p id="shareModalDesc">يمكن لولي الأمر فتح هذا الرابط مباشرة من الهاتف دون الحاجة لتسجيل الدخول، وستكون الصفحة للقراءة فقط.</p>
       <div class="share-link-row">
         <input type="text" id="shareLinkInput" readonly>
         <button class="btn btn-outline" id="btnCopyLink">📋 نسخ</button>
