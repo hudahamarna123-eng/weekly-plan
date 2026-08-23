@@ -43,10 +43,13 @@
         <button class="btn btn-ghost" id="btnMenuToggle" title="المزيد">⋯</button>
         <div class="menu-dropdown hidden" id="menuDropdown">
           <button id="btnCopyPrev">📋 نسخ خطة الأسبوع السابق</button>
+          <button id="btnParentPortalLink">👨‍👩‍👧‍👦 رابط عام لجميع الأبناء (ولي الأمر يختار الصف بنفسه)</button>
+          <button id="btnManagePlans">🗂️ إدارة/حذف الخطط المحفوظة</button>
           <button id="btnExport">📦 تصدير JSON</button>
           <button id="btnImportTrigger">📥 استيراد JSON</button>
           <input type="file" id="fileImport" accept="application/json" class="hidden">
-          <button id="btnClearAll" class="danger">🗑️ مسح جميع البيانات</button>
+          <button id="btnDeleteCurrentPlan" class="danger">🗑️ حذف هذه الخطة نهائياً</button>
+          <button id="btnClearAll" class="danger">🗑️ مسح جميع البيانات (بدء أسبوع جديد)</button>
         </div>
       </div>
     </div>
@@ -71,14 +74,14 @@
         <p class="school-fixed">🏫 مدرسة السلف الصالح الخاصة</p>
       </div>
 
-      <div class="week-picker no-print">
+      <div class="week-picker no-print" id="weekPickerField">
         <label for="weekInput">اختر الأسبوع</label>
         <input type="week" id="weekInput">
       </div>
     </div>
 
     <div class="header-grid">
-      <div class="field">
+      <div class="field" id="academicYearField">
         <label>العام الأكاديمي</label>
         <input type="text" id="academicYear" placeholder="مثال: 2026 / 2027">
       </div>
@@ -104,10 +107,10 @@
         <label>الشعبة</label>
         <select id="section">
           <option value="">اختر الشعبة</option>
-          <option value="A">A</option>
-          <option value="B">B</option>
-          <option value="C">C</option>
-          <option value="D">D</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
         </select>
       </div>
       <div class="field">
@@ -118,11 +121,11 @@
         <label>اسم الطالب <small>(اختياري)</small></label>
         <input type="text" id="studentName" placeholder="اسم الطالب">
       </div>
-      <div class="field">
+      <div class="field" id="weekNumberField">
         <label>رقم الأسبوع</label>
         <input type="number" id="weekNumber" min="1" max="52" value="1">
       </div>
-      <div class="field retrieve-field">
+      <div class="field retrieve-field" id="retrieveField">
         <label>&nbsp;</label>
         <button type="button" class="btn btn-retrieve" id="btnRetrievePlan" title="استرجاع الخطة المحفوظة لهذا الصف والشعبة">
           🔄 استرجاع الخطة المحفوظة
@@ -197,6 +200,22 @@
       <div class="share-buttons">
         <a href="#" target="_blank" class="btn btn-whatsapp" id="btnWhatsapp">💬 واتساب</a>
         <a href="#" class="btn btn-outline" id="btnEmail">✉️ البريد الإلكتروني</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ نافذة إدارة/حذف الخطط المحفوظة ============ -->
+<div class="modal-overlay hidden" id="managePlansModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🗂️ إدارة الخطط المحفوظة</h3>
+      <button class="modal-close" id="closeManagePlansModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p>كل الخطط المحفوظة في قاعدة البيانات. اضغط 🗑️ لحذف أي خطة نهائياً — هذا الإجراء لا يمكن التراجع عنه.</p>
+      <div id="managePlansList" class="manage-plans-list">
+        <p class="manage-plans-loading">جاري تحميل قائمة الخطط...</p>
       </div>
     </div>
   </div>
