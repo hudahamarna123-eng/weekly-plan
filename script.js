@@ -118,6 +118,8 @@ function hideDbSetupBanner() {
    ------------------------------------------------------------ */
 let state = createEmptyState();
 let isReadOnly = false;
+let isSnapshotReadOnly = false; // true فقط لرابط اللقطة الثابتة القديم (بيانات مُرمّزة كاملة داخل الرابط)
+let isParentPortal = false; // true لبوابة ولي الأمر العامة (تصفّح حي من قاعدة البيانات لأي صف/شعبة)
 let isLocked = false;
 let autosaveTimer = null;
 let suppressContextReload = false; // لمنع إعادة التحميل أثناء تطبيق حالة على الواجهة برمجياً
@@ -219,30 +221,30 @@ function buildGrid() {
    5) ربط حقول الرأس (بيانات المدرسة) بالحالة
    ------------------------------------------------------------ */
 function bindHeaderInputs() {
-  const map = {
-    academicYear: "academicYear",
-    grade: "grade",
-    section: "section",
-    homeroom: "homeroom",
-    studentName: "studentName",
-    weekNumber: "weekNumber",
-  };
-  Object.entries(map).forEach(([id, field]) => {
+  // الحقول التي تُغيّر "هوية" الخطة نفسها (أي صف/شعبة/عام/أسبوع تخصه)
+  // يجب معها أولاً حفظ أي تعديل معلّق على الخطة القديمة قبل الانتقال،
+  // ثم استرجاع خطة الصف/الشعبة الجديدة — بدون جدولة حفظ بمحتوى قديم
+  // قد يصل متأخراً ويُكتب بالخطأ فوق بيانات الصف الجديد.
+  const identityFields = ["academicYear", "grade", "section", "weekNumber"];
+  const plainFields = ["homeroom", "studentName"];
+
+  identityFields.forEach((id) => {
     const el = document.getElementById(id);
     const isSelect = el.tagName === "SELECT";
-    el.addEventListener(isSelect ? "change" : "input", () => {
-      state[field] = field === "weekNumber" ? Number(el.value || 1) : el.value;
-      if (field === "weekNumber") updateRibbon();
-      scheduleAutosave();
-      // القوائم المنسدلة (الصف/الشعبة) تحمّل خطة الصف فوراً بعد التحديث أعلاه
-      if (isSelect) handleContextChange();
+    el.addEventListener(isSelect ? "change" : "input", async () => {
+      await flushPendingAutosave(); // احفظ الخطة القديمة أولاً إن كان هناك تعديل غير محفوظ
+      state[id] = id === "weekNumber" ? Number(el.value || 1) : el.value;
+      if (id === "weekNumber") updateRibbon();
+      handleContextChange(); // يتكفّل هو بتحميل أو تصفير الجدول للسياق الجديد فقط
     });
   });
 
-  // حقول العام الأكاديمي ورقم الأسبوع نصية/رقمية: نحمّل الخطة المطابقة
-  // فقط بعد أن ينتهي المعلم من الكتابة فيها (عند الخروج من الحقل)
-  ["academicYear", "weekNumber"].forEach((id) => {
-    document.getElementById(id).addEventListener("change", handleContextChange);
+  plainFields.forEach((id) => {
+    const el = document.getElementById(id);
+    el.addEventListener("input", () => {
+      state[id] = el.value;
+      scheduleAutosave();
+    });
   });
 
   document.getElementById("weekInput").addEventListener("change", (e) => {
@@ -273,11 +275,33 @@ function bindHeaderInputs() {
 }
 
 async function handleContextChange() {
-  if (suppressContextReload || isReadOnly) return;
+  if (suppressContextReload || isSnapshotReadOnly) return;
   if (!state.grade || !state.section) {
     // ننتظر اختيار الصف والشعبة معاً قبل محاولة استرجاع أي خطة
     return;
   }
+
+  // في بوابة ولي الأمر: يبحث فقط بالصف والشعبة عن آخر خطة محفوظة،
+  // بدون الحاجة لمعرفة العام الأكاديمي أو رقم الأسبوع بدقة
+  if (isParentPortal) {
+    const currentGrade = state.grade, currentSection = state.section;
+    try {
+      const latestPlan = await getLatestPlanForGradeSection(currentGrade, currentSection);
+      if (latestPlan) {
+        state = mergeWithEmptyState(latestPlan);
+        applyStateToUI();
+        flashSaveStatus(`✅ آخر خطة محفوظة لـ(${currentGrade} - ${currentSection}) — الأسبوع ${state.weekNumber}`);
+      } else {
+        resetGridKeepingHeader();
+        flashSaveStatus(`لا توجد أي خطة محفوظة بعد لـ(${currentGrade} - ${currentSection})`);
+      }
+    } catch (e) {
+      showDbSetupBanner();
+      flashSaveStatus("🔴 تعذّر الاتصال بقاعدة البيانات");
+    }
+    return;
+  }
+
   const id = getCurrentPlanId();
   try {
     const existing = await getPlanById(id);
@@ -457,22 +481,55 @@ async function savePlan(showStatus = true) {
 
   const id = getCurrentPlanId();
   const docRef = firestoreDB.collection("weeklyPlans").doc(id);
+  // نحفظ هذه الحقول أيضاً على مستوى الوثيقة (وليس فقط داخل plan) لنتمكن من
+  // البحث المباشر بها لاحقاً (تُستخدم في بوابة ولي الأمر لإيجاد "آخر خطة"
+  // لصف وشعبة معينين دون الحاجة لمعرفة العام الأكاديمي أو رقم الأسبوع بدقة)
+  const searchableFields = {
+    grade: state.grade || "",
+    section: state.section || "",
+    academicYear: state.academicYear || "",
+    weekNumber: state.weekNumber || 1,
+  };
 
   try {
     const existing = await docRef.get(); // SELECT: هل السجل موجود؟
     if (existing.exists) {
       // UPDATE: تحديث نفس السجل، بدون إنشاء أي سجل جديد
-      await docRef.update({ plan: state, updatedAt: Date.now() });
+      await docRef.update({ plan: state, ...searchableFields, updatedAt: Date.now() });
       if (showStatus) flashSaveStatus("✅ تم تحديث الخطة المحفوظة");
     } else {
       // INSERT: إنشاء سجل جديد فقط عند عدم وجوده مسبقاً
-      await docRef.set({ plan: state, createdAt: Date.now(), updatedAt: Date.now() });
+      await docRef.set({ plan: state, ...searchableFields, createdAt: Date.now(), updatedAt: Date.now() });
       if (showStatus) flashSaveStatus("✅ تم إنشاء الخطة وحفظها");
     }
   } catch (e) {
     console.error("تعذّر الحفظ في قاعدة البيانات:", e);
     flashSaveStatus("⚠️ تعذّر الحفظ، تحقق من الاتصال بالإنترنت");
   }
+}
+
+// يُستخدَم في بوابة ولي الأمر: يبحث عن آخر خطة محفوظة (الأحدث تحديثاً)
+// لصف وشعبة معينين، بغض النظر عن العام الأكاديمي أو رقم الأسبوع، حتى لا
+// يحتاج ولي الأمر لمعرفة هذين التفصيلين لعرض خطة ابنه.
+async function getLatestPlanForGradeSection(grade, section) {
+  if (!isDbConnected) throw new Error("قاعدة البيانات غير متصلة");
+  const snapshot = await firestoreDB
+    .collection("weeklyPlans")
+    .where("grade", "==", grade)
+    .where("section", "==", section)
+    .get();
+  if (snapshot.empty) return null;
+  let latestPlan = null;
+  let latestTime = -Infinity;
+  snapshot.forEach((doc) => {
+    const data = doc.data();
+    const t = data.updatedAt || 0;
+    if (t > latestTime) {
+      latestTime = t;
+      latestPlan = data.plan;
+    }
+  });
+  return latestPlan;
 }
 
 function scheduleAutosave() {
@@ -483,8 +540,20 @@ function scheduleAutosave() {
   flashSaveStatus("... جارٍ الحفظ في قاعدة البيانات");
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(async () => {
+    autosaveTimer = null;
     await savePlan(false);
   }, 800);
+}
+
+// يُنفَّذ الحفظ المعلَّق (إن وُجد) فوراً بدل الانتظار 0.8 ثانية، ويُستخدم
+// تحديداً قبل تبديل الصف/الشعبة/العام/الأسبوع، حتى لا يُفقد أي تعديل لم
+// يُحفظ بعد، ولا يُكتب بالخطأ فوق بيانات صف/شعبة أخرى بعد التبديل.
+async function flushPendingAutosave() {
+  if (autosaveTimer) {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = null;
+    await savePlan(false);
+  }
 }
 
 function flashSaveStatus(text) {
@@ -766,14 +835,147 @@ function closeShareModal() {
   document.getElementById("shareModal").classList.add("hidden");
 }
 
-// عند فتح الصفحة من رابط مشاركة: تفعيل وضع القراءة فقط
+/* ------------------------------------------------------------
+   حذف الخطط: حذف الخطة الحالية المعروضة، أو حذف أي خطة من قائمة
+   بكل الخطط المحفوظة (لا تتوفران في وضع القراءة/بوابة ولي الأمر)
+   ------------------------------------------------------------ */
+
+// حذف الخطة المعروضة حالياً على الشاشة (حسب العام/الأسبوع/الصف/الشعبة الحالية)
+async function deleteCurrentPlan() {
+  if (isReadOnly) return;
+  if (!state.grade || !state.section) {
+    alert("لا توجد خطة محدَّدة حالياً لحذفها. اختر الصف والشعبة أولاً.");
+    return;
+  }
+  if (!isDbConnected) {
+    showDbSetupBanner();
+    return;
+  }
+  const label = `${state.grade} - ${state.section} - الأسبوع ${state.weekNumber}`;
+  if (!confirm(`⚠️ سيتم حذف خطة (${label}) نهائياً من قاعدة البيانات ولا يمكن التراجع عن هذا. هل أنت متأكد؟`)) return;
+
+  try {
+    await firestoreDB.collection("weeklyPlans").doc(getCurrentPlanId()).delete();
+    resetGridKeepingHeader();
+    flashSaveStatus("🗑️ تم حذف الخطة نهائياً");
+    alert(`✅ تم حذف خطة (${label}) نهائياً.`);
+  } catch (e) {
+    console.error("تعذّر حذف الخطة:", e);
+    alert("⚠️ تعذّر حذف الخطة، تحقق من اتصالك بالإنترنت وحاول مجدداً.");
+  }
+}
+
+// جلب كل الخطط المحفوظة في قاعدة البيانات وعرضها في نافذة الإدارة
+async function loadManagePlansList() {
+  const container = document.getElementById("managePlansList");
+  container.innerHTML = '<p class="manage-plans-loading">جاري تحميل قائمة الخطط...</p>';
+
+  if (!isDbConnected) {
+    container.innerHTML = '<p class="manage-plans-empty">⚠️ قاعدة البيانات غير متصلة حالياً.</p>';
+    return;
+  }
+
+  try {
+    const snapshot = await firestoreDB.collection("weeklyPlans").get();
+    if (snapshot.empty) {
+      container.innerHTML = '<p class="manage-plans-empty">لا توجد أي خطط محفوظة بعد.</p>';
+      return;
+    }
+
+    const rows = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      const plan = data.plan || {};
+      // الحقول الأساسية للعرض: نأخذها من مستوى الوثيقة إن وُجدت (الخطط
+      // الجديدة)، وإلا نرجع لقراءتها من داخل plan (الخطط القديمة)
+      const grade = data.grade || plan.grade || "—";
+      const section = data.section || plan.section || "—";
+      const year = data.academicYear || plan.academicYear || "—";
+      const week = data.weekNumber || plan.weekNumber || "—";
+      const updatedAt = data.updatedAt ? new Date(data.updatedAt).toLocaleString("ar-EG") : "—";
+      rows.push({ id: doc.id, grade, section, year, week, updatedAt, updatedAtRaw: data.updatedAt || 0 });
+    });
+
+    rows.sort((a, b) => b.updatedAtRaw - a.updatedAtRaw);
+
+    container.innerHTML = "";
+    rows.forEach((row) => {
+      const rowEl = document.createElement("div");
+      rowEl.className = "manage-plan-row";
+      rowEl.innerHTML = `
+        <div class="manage-plan-info">
+          <span class="manage-plan-title">${row.grade} — شعبة ${row.section} — الأسبوع ${row.week}</span>
+          <span class="manage-plan-meta">العام: ${row.year} · آخر تحديث: ${row.updatedAt}</span>
+        </div>
+        <button class="manage-plan-delete-btn" data-plan-id="${row.id}">🗑️ حذف</button>
+      `;
+      container.appendChild(rowEl);
+    });
+
+    container.querySelectorAll(".manage-plan-delete-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const planId = btn.dataset.planId;
+        if (!confirm("⚠️ سيتم حذف هذه الخطة نهائياً من قاعدة البيانات ولا يمكن التراجع عن هذا. هل أنت متأكد؟")) return;
+        try {
+          await firestoreDB.collection("weeklyPlans").doc(planId).delete();
+          // لو كانت هذه هي الخطة المعروضة حالياً على الشاشة، أفرغ الجدول
+          if (planId === getCurrentPlanId()) {
+            resetGridKeepingHeader();
+            flashSaveStatus("🗑️ تم حذف الخطة نهائياً");
+          }
+          loadManagePlansList(); // إعادة تحميل القائمة بعد الحذف
+        } catch (e) {
+          console.error("تعذّر حذف الخطة:", e);
+          alert("⚠️ تعذّر حذف الخطة، تحقق من اتصالك بالإنترنت وحاول مجدداً.");
+        }
+      });
+    });
+  } catch (e) {
+    console.error("تعذّر تحميل قائمة الخطط:", e);
+    container.innerHTML = '<p class="manage-plans-empty">⚠️ تعذّر تحميل القائمة، تحقق من اتصالك بالإنترنت.</p>';
+  }
+}
+
+function openManagePlansModal() {
+  document.getElementById("managePlansModal").classList.remove("hidden");
+  loadManagePlansList();
+}
+
+function closeManagePlansModal() {
+  document.getElementById("managePlansModal").classList.add("hidden");
+}
+
+// رابط عام لجميع أبناء ولي الأمر: لا يحمل بيانات خطة محددة، بل يفتح "بوابة"
+// يختار منها ولي الأمر بنفسه صف وشعبة كل ابن من أبنائه، وتُجلب الخطة حيّة
+// من قاعدة البيانات لحظة الاختيار — رابط واحد يصلح لكل الأبناء ولا يحتاج
+// تحديثه أبداً مع تغيّر الأسابيع لاحقاً.
+function buildParentPortalLink() {
+  const url = new URL(window.location.href.split("#")[0].split("?")[0]);
+  url.searchParams.set("portal", "parent");
+  return url.toString();
+}
+
+function openParentPortalShareModal() {
+  const link = buildParentPortalLink();
+  document.getElementById("shareLinkInput").value = link;
+  const message = encodeURIComponent(
+    `رابط دائم لمتابعة الخطة الأسبوعية لجميع أبنائك (اختر الصف والشعبة لكل ابن من نفس الرابط): ${link}`
+  );
+  document.getElementById("btnWhatsapp").href = `https://wa.me/?text=${message}`;
+  document.getElementById("btnEmail").href = `mailto:?subject=${encodeURIComponent(
+    "رابط متابعة الخطة الأسبوعية"
+  )}&body=${message}`;
+  document.getElementById("shareModal").classList.remove("hidden");
+}
+
+// عند فتح الصفحة من رابط مشاركة (لقطة ثابتة قديمة لخطة أسبوع محدد): تفعيل وضع القراءة الثابت
 function checkReadOnlyFromHash() {
   const hash = window.location.hash;
   if (hash.startsWith("#share=")) {
     try {
       const data = decodeStateFromHash(hash.replace("#share=", ""));
       state = mergeWithEmptyState(data);
-      enterReadOnlyMode();
+      enterSnapshotReadOnlyMode();
       return true;
     } catch (e) {
       console.error("تعذّر قراءة رابط المشاركة", e);
@@ -782,8 +984,20 @@ function checkReadOnlyFromHash() {
   return false;
 }
 
-function enterReadOnlyMode() {
+// عند فتح الصفحة من رابط "بوابة ولي الأمر" العام (?portal=parent):
+// تفعيل وضع قراءة حي يسمح باختيار أي صف/شعبة وجلب خطتها من قاعدة البيانات
+function checkParentPortalFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("portal") === "parent") {
+    enterParentPortalMode();
+    return true;
+  }
+  return false;
+}
+
+function enterSnapshotReadOnlyMode() {
   isReadOnly = true;
+  isSnapshotReadOnly = true;
   document.body.classList.add("read-only-mode");
   document.getElementById("readOnlyBanner").classList.remove("hidden");
   document.getElementById("dbSetupBanner").classList.add("hidden"); // غير ذي صلة بصفحة ولي الأمر
@@ -792,15 +1006,55 @@ function enterReadOnlyMode() {
   lockAllFields(true);
 }
 
+function enterParentPortalMode() {
+  isReadOnly = true;
+  isParentPortal = true;
+  document.body.classList.add("read-only-mode");
+  const banner = document.getElementById("readOnlyBanner");
+  banner.classList.remove("hidden");
+  banner.querySelector("span").textContent =
+    "👨‍👩‍👧‍👦 بوابة ولي الأمر — اختر الصف والشعبة لكل ابن من القائمة أعلاه لعرض آخر خطة له (للقراءة فقط)";
+  document.getElementById("dbSetupBanner").classList.add("hidden");
+  document.getElementById("toolbar").classList.add("hidden");
+  document.getElementById("parentDownloadBar").classList.remove("hidden");
+
+  // ولي الأمر لا يحتاج اختيار العام الأكاديمي أو رقم الأسبوع أو الاسترجاع
+  // اليدوي — يكفيه اختيار الصف والشعبة فقط، وتُعرض له آخر خطة تلقائياً
+  ["academicYearField", "weekNumberField", "weekPickerField", "retrieveField"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add("hidden");
+  });
+
+  // في بوابة ولي الأمر تبقى قوائم الصف/الشعبة مفعّلة للاختيار، بينما يُقفل
+  // محتوى الخطة نفسه (الجدول والملاحظات) فقط لمنع أي تعديل
+  lockAllFields(true, { keepContextFieldsEnabled: true });
+}
+
 /* ------------------------------------------------------------
    14) وضع القفل/التعديل
    ------------------------------------------------------------ */
-function lockAllFields(lock) {
+function lockAllFields(lock, options = {}) {
   document
-    .querySelectorAll(
-      "#weekGrid [data-type], #parentNotes, .header-grid input, .header-grid select, #weekInput, #logoInput, #btnRetrievePlan"
-    )
+    .querySelectorAll("#weekGrid [data-type], #parentNotes, #logoInput")
     .forEach((el) => (el.disabled = lock));
+
+  // في بوابة ولي الأمر يبقى اختيار الصف والشعبة فقط مفعّلاً (للتنقل بين
+  // الأبناء)، بينما تبقى كل حقول المحتوى الأخرى (رائد الصف، اسم الطالب،
+  // العام الأكاديمي، الأسبوع) مقفلة كالمعتاد لأنها ليست جزءاً من الاختيار
+  const selectionOnlyIds = ["grade", "section"];
+  const otherHeaderIds = ["academicYear", "homeroom", "studentName", "weekNumber", "weekInput"];
+
+  selectionOnlyIds.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = options.keepContextFieldsEnabled ? false : lock;
+  });
+  otherHeaderIds.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = lock;
+  });
+
+  const retrieveBtn = document.getElementById("btnRetrievePlan");
+  if (retrieveBtn) retrieveBtn.disabled = lock;
 }
 
 function toggleEditMode() {
@@ -851,6 +1105,22 @@ function bindToolbar() {
   document.addEventListener("click", () => menu.classList.add("hidden"));
 
   document.getElementById("btnCopyPrev").addEventListener("click", copyPreviousWeek);
+  document.getElementById("btnParentPortalLink").addEventListener("click", () => {
+    document.getElementById("menuDropdown").classList.add("hidden");
+    openParentPortalShareModal();
+  });
+  document.getElementById("btnManagePlans").addEventListener("click", () => {
+    document.getElementById("menuDropdown").classList.add("hidden");
+    openManagePlansModal();
+  });
+  document.getElementById("closeManagePlansModal").addEventListener("click", closeManagePlansModal);
+  document.getElementById("managePlansModal").addEventListener("click", (e) => {
+    if (e.target.id === "managePlansModal") closeManagePlansModal();
+  });
+  document.getElementById("btnDeleteCurrentPlan").addEventListener("click", () => {
+    document.getElementById("menuDropdown").classList.add("hidden");
+    deleteCurrentPlan();
+  });
   document.getElementById("btnClearAll").addEventListener("click", clearAllData);
   document.getElementById("btnExport").addEventListener("click", exportJSON);
   document.getElementById("btnImportTrigger").addEventListener("click", () =>
@@ -878,9 +1148,10 @@ async function init() {
   bindToolbar();
 
   const cameFromShareLink = checkReadOnlyFromHash();
+  const cameFromParentPortal = !cameFromShareLink && checkParentPortalFromQuery();
   // لا يوجد "آخر خطة" تُحفظ محلياً بعد الآن: الصفحة تبدأ فارغة حتى يختار
-  // المعلم العام الأكاديمي والأسبوع والصف والشعبة، فيُسترجع تلقائياً
-  // (أو تُنشأ خطة جديدة) مباشرة من قاعدة البيانات.
+  // المعلم (أو ولي الأمر في وضع البوابة) العام الأكاديمي والأسبوع والصف
+  // والشعبة، فتُسترجع تلقائياً (أو تُنشأ خطة جديدة) مباشرة من قاعدة البيانات.
 
   applyStateToUI();
 }
