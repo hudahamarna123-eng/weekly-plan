@@ -116,9 +116,14 @@
         <label>رائد الصف</label>
         <input type="text" id="homeroom" placeholder="اسم رائد الصف">
       </div>
-      <div class="field">
-        <label>اسم الطالب <small>(اختياري)</small></label>
-        <input type="text" id="studentName" placeholder="اسم الطالب">
+      <div class="field" id="semesterField">
+        <label>الفصل الدراسي</label>
+        <select id="semester">
+          <option value="">اختر الفصل</option>
+          <option value="الأول">الفصل الأول</option>
+          <option value="الثاني">الفصل الثاني</option>
+          <option value="الثالث">الفصل الثالث</option>
+        </select>
       </div>
       <div class="field" id="weekNumberField">
         <label>رقم الأسبوع</label>
@@ -175,6 +180,9 @@
       <span class="parent-hint">ملاحظات، تنبيهات، روابط تعليمية، ملفات، فيديوهات، نصائح</span>
     </div>
     <textarea id="parentNotes" placeholder="اكتب هنا أي ملاحظات أو تنبيهات أو روابط تهم ولي الأمر..." rows="5"></textarea>
+    <!-- تُعرض هذه النسخة بدل مربع الكتابة في وضع القراءة فقط (ولي الأمر)،
+         وتحوّل أي رابط داخل الملاحظات إلى رابط فعّال قابل للنقر -->
+    <div id="parentNotesReadOnly" class="parent-notes-readonly hidden"></div>
   </section>
 
   <footer class="sheet-footer">
