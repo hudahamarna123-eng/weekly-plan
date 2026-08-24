@@ -487,6 +487,26 @@ body.read-only-mode .parent-notes textarea:disabled{
 }
 .parent-notes textarea:focus{outline:none;border-color:var(--yellow-600);}
 
+.parent-notes-readonly{
+  width:100%;
+  border:1.5px solid var(--yellow-border);
+  border-radius:12px;
+  padding:12px 14px;
+  font-size:14px;
+  background:#fffdf7;
+  color:var(--ink-900);
+  line-height:1.8;
+  min-height:60px;
+  word-break:break-word;
+}
+.parent-notes-readonly a{
+  color:var(--blue-700,#1d4ed8);
+  font-weight:700;
+  text-decoration:underline;
+}
+.parent-notes-readonly a:hover{color:var(--yellow-600);}
+.parent-notes-empty{color:var(--ink-300,#94a3b8);}
+
 .sheet-footer{
   display:flex;justify-content:space-between;
   color:var(--ink-300);font-size:12px;margin-top:18px;padding:0 4px;
