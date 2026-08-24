@@ -673,7 +673,9 @@ function linkifyText(str) {
   const urlPattern = /((https?:\/\/|www\.)[^\s<]+)/gi;
   return escaped.replace(urlPattern, (match) => {
     const href = match.startsWith("http") ? match : `https://${match}`;
-    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${match}</a>`;
+    // dir="ltr" + unicode-bidi:isolate ضروريان هنا لمنع تشابك/تراكب أحرف
+    // الرابط الإنجليزي بصرياً عند عرضه داخل صفحة عربية (اتجاه RTL)
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer" dir="ltr" style="unicode-bidi:isolate; display:inline-block;">${match}</a>`;
   });
 }
 
