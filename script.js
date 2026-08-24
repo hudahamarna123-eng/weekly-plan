@@ -132,7 +132,7 @@ function createEmptyState() {
     grade: "",
     section: "",
     homeroom: "",
-    studentName: "",
+    semester: "",
     weekNumber: 1,
     weekInput: "",
     logo: "",
@@ -226,8 +226,8 @@ function bindHeaderInputs() {
   // يجب معها أولاً حفظ أي تعديل معلّق على الخطة القديمة قبل الانتقال،
   // ثم استرجاع خطة الصف/الشعبة الجديدة — بدون جدولة حفظ بمحتوى قديم
   // قد يصل متأخراً ويُكتب بالخطأ فوق بيانات الصف الجديد.
-  const identityFields = ["academicYear", "grade", "section", "weekNumber"];
-  const plainFields = ["homeroom", "studentName"];
+  const identityFields = ["academicYear", "semester", "grade", "section", "weekNumber"];
+  const plainFields = ["homeroom"];
 
   identityFields.forEach((id) => {
     const el = document.getElementById(id);
@@ -351,7 +351,7 @@ function resetGridKeepingHeader() {
     grade: state.grade,
     section: state.section,
     homeroom: state.homeroom,
-    studentName: state.studentName,
+    semester: state.semester,
     weekNumber: state.weekNumber,
     weekInput: state.weekInput,
     logo: state.logo,
@@ -389,10 +389,14 @@ function applyStateToUI() {
   document.getElementById("grade").value = state.grade || "";
   document.getElementById("section").value = state.section || "";
   document.getElementById("homeroom").value = state.homeroom || "";
-  document.getElementById("studentName").value = state.studentName || "";
+  document.getElementById("semester").value = state.semester || "";
   document.getElementById("weekNumber").value = state.weekNumber || 1;
   document.getElementById("weekInput").value = state.weekInput || "";
   document.getElementById("parentNotes").value = state.parentNotes || "";
+  const notesReadOnlyEl = document.getElementById("parentNotesReadOnly");
+  notesReadOnlyEl.innerHTML = state.parentNotes
+    ? linkifyText(state.parentNotes)
+    : '<span class="parent-notes-empty">لا توجد ملاحظات لهذا الأسبوع.</span>';
 
   document.querySelectorAll("#weekGrid [data-type]").forEach((field) => {
     const { day, subject, type } = field.dataset;
@@ -439,11 +443,12 @@ function sanitizeKeyPart(value) {
 
 function getCurrentPlanId() {
   const year = sanitizeKeyPart(state.academicYear || "بدون-عام");
+  const semester = sanitizeKeyPart(state.semester || "بدون-فصل");
   const grade = sanitizeKeyPart(state.grade || "بدون-صف");
   const section = sanitizeKeyPart(state.section || "بدون-شعبة");
-  // ترتيب المفتاح: العام الأكاديمي، الأسبوع، الصف، الشعبة — بحيث تكون
-  // لكل صف وشعبة (ولكل أسبوع) خطة مستقلة تماماً عن غيرها
-  return `${year}__W${state.weekNumber || 1}__${grade}__${section}`;
+  // ترتيب المفتاح: العام الأكاديمي، الفصل الدراسي، الأسبوع، الصف، الشعبة —
+  // بحيث تكون لكل صف وشعبة (ولكل فصل دراسي وأسبوع) خطة مستقلة تماماً عن غيرها
+  return `${year}__S${semester}__W${state.weekNumber || 1}__${grade}__${section}`;
 }
 
 // SELECT: قراءة خطة بمفتاحها الأساسي من قاعدة البيانات مباشرة.
@@ -477,6 +482,7 @@ async function savePlan(showStatus = true) {
     grade: state.grade || "",
     section: state.section || "",
     academicYear: state.academicYear || "",
+    semester: state.semester || "",
     weekNumber: state.weekNumber || 1,
   };
 
@@ -659,6 +665,18 @@ function escapeHtml(str) {
     .replace(/\n/g, "<br>");
 }
 
+// يحوّل أي نص يحتوي روابط (http/https) إلى HTML آمن (مع تفريغ الوسوم أولاً
+// لمنع أي كود ضار)، وتصبح الروابط بداخله قابلة للنقر مباشرة تفتح في تبويب
+// جديد. يُستخدم في عرض "ملاحظات لولي الأمر" للقراءة، وفي نسخة الطباعة/PDF.
+function linkifyText(str) {
+  const escaped = escapeHtml(str);
+  const urlPattern = /((https?:\/\/|www\.)[^\s<]+)/gi;
+  return escaped.replace(urlPattern, (match) => {
+    const href = match.startsWith("http") ? match : `https://${match}`;
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${match}</a>`;
+  });
+}
+
 // يبني صفحة طباعة منظمة (يوم بيوم) من بيانات الخطة الحالية، وتُستخدم
 // في كل من الطباعة العادية (window.print) وفي تحميل PDF
 function buildPrintableArea() {
@@ -667,10 +685,10 @@ function buildPrintableArea() {
 
   const metaRows = [
     ["العام الأكاديمي", state.academicYear],
+    ["الفصل الدراسي", state.semester ? `الفصل ${state.semester}` : ""],
     ["الصف", state.grade],
     ["الشعبة", state.section],
     ["رائد الصف", state.homeroom],
-    ["اسم الطالب", state.studentName],
     ["الأسبوع", state.weekNumber],
   ]
     .filter(([, v]) => v)
@@ -713,7 +731,7 @@ function buildPrintableArea() {
   }
 
   const notesHtml = state.parentNotes
-    ? `<div class="print-notes"><h2>💛 ملاحظات لولي الأمر</h2><p>${escapeHtml(state.parentNotes)}</p></div>`
+    ? `<div class="print-notes"><h2>💛 ملاحظات لولي الأمر</h2><p>${linkifyText(state.parentNotes)}</p></div>`
     : "";
 
   const logoHtml = `<img src="${SCHOOL_LOGO}" class="print-logo" alt="شعار المدرسة">`;
@@ -991,6 +1009,11 @@ function checkParentPortalFromQuery() {
   return false;
 }
 
+function switchToReadOnlyNotesView() {
+  document.getElementById("parentNotes").classList.add("hidden");
+  document.getElementById("parentNotesReadOnly").classList.remove("hidden");
+}
+
 function enterSnapshotReadOnlyMode() {
   isReadOnly = true;
   isSnapshotReadOnly = true;
@@ -999,6 +1022,7 @@ function enterSnapshotReadOnlyMode() {
   document.getElementById("dbSetupBanner").classList.add("hidden"); // غير ذي صلة بصفحة ولي الأمر
   document.getElementById("toolbar").classList.add("hidden");
   document.getElementById("parentDownloadBar").classList.remove("hidden");
+  switchToReadOnlyNotesView();
   lockAllFields(true);
 }
 
@@ -1013,10 +1037,11 @@ function enterParentPortalMode() {
   document.getElementById("dbSetupBanner").classList.add("hidden");
   document.getElementById("toolbar").classList.add("hidden");
   document.getElementById("parentDownloadBar").classList.remove("hidden");
+  switchToReadOnlyNotesView();
 
   // ولي الأمر لا يحتاج اختيار العام الأكاديمي أو رقم الأسبوع أو الاسترجاع
   // اليدوي — يكفيه اختيار الصف والشعبة فقط، وتُعرض له آخر خطة تلقائياً
-  ["academicYearField", "weekNumberField", "weekPickerField", "retrieveField"].forEach((id) => {
+  ["academicYearField", "semesterField", "weekNumberField", "weekPickerField", "retrieveField"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.classList.add("hidden");
   });
@@ -1038,7 +1063,7 @@ function lockAllFields(lock, options = {}) {
   // الأبناء)، بينما تبقى كل حقول المحتوى الأخرى (رائد الصف، اسم الطالب،
   // العام الأكاديمي، الأسبوع) مقفلة كالمعتاد لأنها ليست جزءاً من الاختيار
   const selectionOnlyIds = ["grade", "section"];
-  const otherHeaderIds = ["academicYear", "homeroom", "studentName", "weekNumber", "weekInput"];
+  const otherHeaderIds = ["academicYear", "semester", "homeroom", "weekNumber", "weekInput"];
 
   selectionOnlyIds.forEach((id) => {
     const el = document.getElementById(id);
